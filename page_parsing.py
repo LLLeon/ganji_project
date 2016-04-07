@@ -16,10 +16,10 @@ headers = {
     'Connection': 'keep-alive'
 }
 proxy_list = [
-    'http://119.7.91.36',
-    'http://115.218.217.10',
-    'http://117.87.176.103',
-    'http://112.16.76.188'
+    'http://115.148.70.109',
+    'http://115.223.224.73',
+    'http://218.20.241.28',
+    'http://113.78.29.36'
 ]
 proxy_ip = random.choice(proxy_list)
 proxies = {'http':proxy_ip}
@@ -32,19 +32,19 @@ def get_links_from(channel, pages, who_sells='1'):
     soup = BeautifulSoup(wb_data.text, 'lxml')
 
     # 检测该页面是否有商品
-        if soup.find('ul', 'pageLink clearfix'):  # 此标签为页面底部页码的标签
-            links = soup.select('dd.feature > div > ul > li > a')
-            for link in links:
-                item_link = link.get('href')
+    if soup.find('ul', 'pageLink clearfix'):  # 此标签为页面底部页码的标签
+        links = soup.select('dd.feature > div > ul > li > a')
+        for link in links:
+            item_link = link.get('href')
 
-                # 判断数据库中是否已有此条链接
-                if url_list.find_one({'url': item_link}):
-                    print('老大,已经抓过这条链接啦~')
-                else:
-                    url_list.insert_one({'url': item_link})
-                    print('老大,新链接抓到啦:', item_link)
-        else:
-            print('老大,{}类别的二手货链接已经抓完啦~'.format(str(channel.split('/')[-2])))
+            # 判断数据库中是否已有此条链接
+            if url_list.find_one({'url': item_link}):
+                print('老大,已经抓过这条链接啦~')
+            else:
+                url_list.insert_one({'url': item_link})
+                print('老大,新链接抓到啦:', item_link)
+    else:
+        print('老大,{}类别的二手货链接已经抓完啦~'.format(str(channel.split('/')[-2])))
 
 
 # get_links_from('http://bj.ganji.com/shouji/', 1000)
@@ -52,29 +52,30 @@ def get_links_from(channel, pages, who_sells='1'):
 
 # 抓取商品详情
 def get_item_info(url):
-    wb_data = requests.get(url)
-    soup = BeautifulSoup(wb_data.text, 'lxml')
+    wb_data = requests.get(url, headers=headers)
+    try:
 
     # 测试该页面商品是否还存在
-    try:
-        if soup.find('p', 'error-tips1'):
+        if wb_data.status_code == 404:
             print('老大,二手货被人买走啦~')
         else:
+            soup = BeautifulSoup(wb_data.text, 'lxml')
             title = soup.select('h1.title-name')[0]
             date = list(soup.select('i.pr-5')[0].stripped_strings)[0]
             type = soup.select('div.leftBox > div:nth-of-type(3) > div > ul > li:nth-of-type(1) > span > a:nth-of-type(1)')[0]
             price = soup.select('i.f22.fc-orange.f-type')[0]
-            area = list(soup.select('div.leftBox > div:nth-of-type(3) > div > ul > li:nth-of-type(3)')[0].stripped_strings)
+            area = list(map(lambda x: x.text, soup.select('ul.det-infor > li:nth-of-type(3) > a')))
             data = {
                 'title': title.get_text(),
                 'date': date.replace(u'\xa0', ''),  # 去除 '\xa0'
                 'type': type.get_text(),
                 'price': price.get_text(),
-                'area': area,
+                'area': area[1:],
+                'url': url
             }
 
             # 检测数据库中是否已抓取此条信息
-            if item_info.find_one({'title': title.get_text()}):
+            if item_info.find_one({'url': url}):
                 print('老大,这个二手货的信息咱们已经抓过啦~')
             else:
                 item_info.insert_one(data)
